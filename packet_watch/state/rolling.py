@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 from packet_watch.models import ParsedPacket
+from packet_watch.detectors.common import protocol_mismatch
 
 
 @dataclass
@@ -135,13 +136,4 @@ class RollingStateTracker:
 
     @staticmethod
     def _is_protocol_mismatch(p: ParsedPacket) -> bool:
-        if p.dst_port is None:
-            return False
-        common = {
-            "TCP": {20, 21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 587, 993, 995},
-            "UDP": {53, 67, 68, 69, 123, 161, 162, 500, 514, 1900, 4500},
-            "ICMP": set(),
-        }
-        if p.protocol in common:
-            return p.dst_port not in common[p.protocol]
-        return False
+        return protocol_mismatch(p)

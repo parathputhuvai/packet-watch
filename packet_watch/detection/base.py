@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from packet_watch.models import DetectionResult, ParsedPacket
-from packet_watch.state import SourceState
+
+if TYPE_CHECKING:
+    from packet_watch.state import SourceState
 
 
 class Detector(ABC):

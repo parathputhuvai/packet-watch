@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import timedelta
 
 from packet_watch.models import Alert, DetectionResult
 from packet_watch.severity import SeverityScorer
@@ -17,6 +18,66 @@ class DetectionEngine:
         self.whitelist = whitelist
         self.logger = logger or logging.getLogger("packet_watch.detection")
         self.suppressed_alerts: list[Alert] = []
+        self._last_alert_at: dict[tuple, object] = {}
+        self.alert_dedup_seconds = 60
+
+    def _dedup_key(self, result, packet) -> tuple:
+        """
+        Build a key used to prevent repeated alerts for the same condition.
+
+        Protocol mismatch includes ports because different flows may
+        legitimately have different destination ports.
+
+        Other detectors are grouped by rule + IP pair + protocol.
+        """
+        if result.rule_id == "PW-MISMATCH-001":
+            return (
+                result.rule_id,
+                result.source_ip,
+                result.destination_ip,
+                result.protocol,
+                packet.src_port,
+                packet.dst_port,
+            )
+
+        return (
+            result.rule_id,
+            result.source_ip,
+            result.destination_ip,
+            result.protocol,
+        )
+
+    def _is_duplicate_alert(self, result, packet) -> bool:
+        """
+        Return True when the same detection was already emitted recently.
+        """
+        key = self._dedup_key(result, packet)
+        current_time = packet.timestamp
+
+        previous_time = self._last_alert_at.get(key)
+
+        if previous_time is not None:
+            elapsed = (current_time - previous_time).total_seconds()
+
+            if elapsed < self.alert_dedup_seconds:
+                return True
+
+        self._last_alert_at[key] = current_time
+
+        # Remove stale deduplication entries occasionally so the dictionary
+        # does not grow forever during a long capture.
+        cutoff = current_time - timedelta(seconds=self.alert_dedup_seconds)
+
+        stale_keys = [
+            stored_key
+            for stored_key, timestamp in self._last_alert_at.items()
+            if timestamp < cutoff
+        ]
+
+        for stored_key in stale_keys:
+            self._last_alert_at.pop(stored_key, None)
+
+        return False
 
     def process(self, packet):
         state = self.state_tracker.observe(packet)
@@ -33,6 +94,10 @@ class DetectionEngine:
             if result is None or result.rule_id in seen_rules:
                 continue
             seen_rules.add(result.rule_id)
+
+            if self._is_duplicate_alert(result, packet):
+                continue
+
             sev = self.severity.assign(result)
             suppressed, reason = self.whitelist.should_suppress(result, packet.dst_port)
             alert = Alert(
