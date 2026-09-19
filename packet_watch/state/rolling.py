@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 from packet_watch.models import ParsedPacket
-from packet_watch.detectors.common import protocol_mismatch
+from packet_watch.detectors.common import is_likely_service_response, protocol_mismatch
 
 
 @dataclass
@@ -19,6 +19,7 @@ class Observation:
 class SourceState:
     observations: deque[Observation] = field(default_factory=deque)
     destination_ports: set[int] = field(default_factory=set)
+    scan_destination_ports: set[int] = field(default_factory=set)
     destination_ips: set[str] = field(default_factory=set)
     source_macs: set[str] = field(default_factory=set)
     syn_count: int = 0
@@ -34,6 +35,7 @@ class SourceState:
 
     def reset_derived(self) -> None:
         self.destination_ports.clear()
+        self.scan_destination_ports.clear()
         self.destination_ips.clear()
         self.source_macs.clear()
         self.syn_count = 0
@@ -100,6 +102,16 @@ class RollingStateTracker:
             p = obs.packet
             if p.dst_port is not None:
                 state.destination_ports.add(p.dst_port)
+
+                # Port scanning is a request-side signal. Do not count
+                # normal service responses (for example DNS 53 -> client
+                # ephemeral port) as many different scanned destinations.
+                request_like = not is_likely_service_response(p)
+                if p.protocol == 'TCP':
+                    flags = set(p.tcp_flags)
+                    request_like = request_like and ('S' in flags and 'A' not in flags)
+                if request_like:
+                    state.scan_destination_ports.add(p.dst_port)
             if p.dst_ip:
                 state.destination_ips.add(p.dst_ip)
             if p.src_mac:
