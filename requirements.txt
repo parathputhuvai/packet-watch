@@ -1,0 +1,6 @@
+scapy>=2.6,<3
+rich>=13,<16
+requests>=2.31,<3
+python-dotenv>=1.0,<2
+fpdf2>=2.7,<3
+pytest>=8,<10

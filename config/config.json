@@ -1,0 +1,21 @@
+{
+  "rolling_window_seconds": 60,
+  "reporting_interval_seconds": 300,
+  "log_level": "INFO",
+  "capture": {"interface": null, "promiscuous": true, "store": false},
+  "whitelist": {"ips": [], "ports": []},
+  "abuseipdb": {"enabled": true, "api_key_env": "PACKET_WATCH_ABUSEIPDB_API_KEY", "max_age_days": 90, "timeout_seconds": 5, "cache_seconds": 900},
+  "sslbl": {"enabled": true, "feed_url": "https://sslbl.abuse.ch/blacklist/ja3_fingerprints.csv", "refresh_seconds": 900, "timeout_seconds": 10},
+  "thresholds": {
+    "port_scan": {"distinct_destination_ports": 20, "high_ports": 50, "critical_ports": 100},
+    "syn_flood": {"syn_packets": 100, "high_syn_packets": 250, "critical_syn_packets": 500, "syn_ack_ratio": 4.0},
+    "arp_spoofing": {"mapping_change_count": 1},
+    "dns_tunneling": {"queries": 15, "high_queries": 30, "entropy": 3.8, "label_length": 45},
+    "brute_force": {"connection_attempts": 10, "high_attempts": 25, "critical_attempts": 50},
+    "ja3": {"match_severity": "HIGH"},
+    "icmp_flood": {"icmp_packets": 100, "high_icmp_packets": 250, "critical_icmp_packets": 500},
+    "ping_sweep": {"distinct_destinations": 10, "high_destinations": 25},
+    "mac_flooding": {"distinct_source_macs": 50, "high_macs": 100, "critical_macs": 250},
+    "protocol_mismatch": {"min_packets": 5, "ratio": 0.7, "high_ratio": 0.9}
+  }
+}
