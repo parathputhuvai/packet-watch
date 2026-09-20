@@ -52,6 +52,7 @@ class PacketWatchApp:
         parsed = self.parser.parse(raw_packet)
         if parsed is None: return
         enrich_tls_packet(parsed, self.sslbl)
+        suppressed_before = {alert.alert_id for alert in self.engine.suppressed_alerts}
         results = self.engine.process(parsed)
         for alert in results:
             if alert.source_ip:
@@ -63,6 +64,10 @@ class PacketWatchApp:
             self.alerts.append(alert)
             self.timeline.add(alert)
             self._print_alert(alert)
+        timeline_alert_ids = {event.alert_id for event in self.timeline.events()}
+        for alert in self.engine.suppressed_alerts:
+            if alert.alert_id not in suppressed_before and alert.alert_id not in timeline_alert_ids:
+                self.timeline.add(alert)
         now = parsed.timestamp
         if (now - self.last_report_at).total_seconds() >= self.settings.reporting_interval_seconds:
             self.export_reports(prefix="periodic")
@@ -98,7 +103,8 @@ class PacketWatchApp:
         stamp = ended.strftime("%Y%m%d_%H%M%S")
         reports_dir = self.settings.root / "reports"
         audit_alerts = self.alerts + list(self.engine.suppressed_alerts)
-        csv_path = write_csv(reports_dir / f"{prefix}_{stamp}.csv", audit_alerts)
-        pdf_path = write_pdf(reports_dir / f"{prefix}_{stamp}.pdf", audit_alerts, self.session_started, ended)
+        timeline_events = self.timeline.events()
+        csv_path = write_csv(reports_dir / f"{prefix}_{stamp}.csv", audit_alerts, timeline_events=timeline_events)
+        pdf_path = write_pdf(reports_dir / f"{prefix}_{stamp}.pdf", audit_alerts, self.session_started, ended, timeline_events=timeline_events)
         self.console.print(f"Reports written: {csv_path.name}, {pdf_path.name}")
         return csv_path, pdf_path
