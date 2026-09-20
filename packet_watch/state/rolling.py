@@ -125,7 +125,7 @@ class RollingStateTracker:
                     state.syn_ack_count += 1
             if p.protocol == "ICMP":
                 state.icmp_count += 1
-            if p.dns_query:
+            if p.protocol == "UDP" and p.dns_query:
                 state.dns_queries.append(p.dns_query)
             if p.arp_psrc and p.arp_hwsrc:
                 previous = latest_arp.get(p.arp_psrc)
