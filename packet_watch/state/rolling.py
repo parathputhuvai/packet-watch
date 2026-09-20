@@ -26,6 +26,7 @@ class SourceState:
     syn_ack_count: int = 0
     icmp_count: int = 0
     tcp_connection_attempts: int = 0
+    tcp_connection_attempts_by_target: dict[tuple[str | None, int | None], int] = field(default_factory=dict)
     dns_queries: deque[str] = field(default_factory=deque)
     arp_mapping_changes: int = 0
     arp_mappings: dict[str, str] = field(default_factory=dict)
@@ -42,6 +43,7 @@ class SourceState:
         self.syn_ack_count = 0
         self.icmp_count = 0
         self.tcp_connection_attempts = 0
+        self.tcp_connection_attempts_by_target.clear()
         self.dns_queries.clear()
         self.arp_mapping_changes = 0
         self.protocol_mismatch_count = 0
@@ -121,6 +123,8 @@ class RollingStateTracker:
                 if "S" in flags and "A" not in flags:
                     state.syn_count += 1
                     state.tcp_connection_attempts += 1
+                    target = (p.dst_ip, p.dst_port)
+                    state.tcp_connection_attempts_by_target[target] = state.tcp_connection_attempts_by_target.get(target, 0) + 1
                 elif "S" in flags and "A" in flags:
                     state.syn_ack_count += 1
             if p.protocol == "ICMP":

@@ -40,6 +40,15 @@ class DetectionEngine:
                 packet.dst_port,
             )
 
+        if result.rule_id == "PW-BRUTE-001":
+            return (
+                result.rule_id,
+                result.source_ip,
+                result.destination_ip,
+                result.protocol,
+                packet.dst_port,
+            )
+
         return (
             result.rule_id,
             result.source_ip,
