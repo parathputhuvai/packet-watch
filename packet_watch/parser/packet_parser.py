@@ -63,7 +63,7 @@ class PacketParser:
                     dns = packet[DNS]
                     if int(getattr(dns, "qr", 1)) == 0 and getattr(dns, "qd", None) is not None:
                         qd = dns.qd
-                        if DNSQR in qd:
+                        if qd is not None and getattr(qd, "qname", None) is not None:
                             qname = bytes(qd.qname).decode(errors="ignore").rstrip(".")
                             result.dns_query = qname
                             result.dns_qtype = int(qd.qtype)
@@ -105,4 +105,4 @@ class PacketParser:
                 out.append(int(item))
             except (TypeError, ValueError):
                 pass
-        return out
+        return out    
