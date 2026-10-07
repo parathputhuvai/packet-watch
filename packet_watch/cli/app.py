@@ -9,7 +9,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from packet_watch import __title__, __version__
-from packet_watch.capture import LiveCapture
+from packet_watch.capture import ActiveInterfaceInfo, LiveCapture, find_active_interface
 from packet_watch.correlation import AlertTimeline
 from packet_watch.detection import DetectionEngine
 from packet_watch.detectors import build_detectors
@@ -47,6 +47,32 @@ class PacketWatchApp:
         table.add_column("#"); table.add_column("Interface")
         for i, name in enumerate(interfaces, 1): table.add_row(str(i), name)
         self.console.print(table)
+
+    def get_active_interface(self) -> ActiveInterfaceInfo:
+        """Resolve the active Windows adapter to its exact Npcap interface."""
+        return find_active_interface()
+
+    def list_active_interface(self) -> ActiveInterfaceInfo:
+        """Display the active Windows adapter and its Npcap mapping."""
+        info = self.get_active_interface()
+        table = Table(title="Active Network Interface")
+        table.add_column("Field", style="bold")
+        table.add_column("Value")
+        table.add_row("Windows adapter", info.friendly_name)
+        table.add_row("Status", info.status)
+        table.add_row("IPv4 address", info.ipv4_address or "-")
+        table.add_row("Default gateway", info.gateway or "-")
+        table.add_row("Interface GUID", info.interface_guid or "-")
+        table.add_row("Npcap interface", info.npcap_interface)
+        self.console.print(table)
+        return info
+
+    def monitor_auto(self):
+        """Discover the active adapter and start the existing monitor pipeline."""
+        info = self.get_active_interface()
+        self.console.print(f"[bold cyan]Auto-selected adapter[/bold cyan]: {info.friendly_name}")
+        self.console.print(f"[bold cyan]Npcap capture interface[/bold cyan]: {info.npcap_interface}")
+        return self.monitor(info.npcap_interface)
 
     def process_packet(self, raw_packet):
         parsed = self.parser.parse(raw_packet)

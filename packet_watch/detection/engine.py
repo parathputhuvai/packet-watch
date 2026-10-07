@@ -36,7 +36,6 @@ class DetectionEngine:
                 result.source_ip,
                 result.destination_ip,
                 result.protocol,
-                packet.src_port,
                 packet.dst_port,
             )
 

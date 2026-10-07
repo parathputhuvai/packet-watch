@@ -6,7 +6,11 @@ from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 from packet_watch.models import ParsedPacket
-from packet_watch.detectors.common import is_likely_service_response, protocol_mismatch
+from packet_watch.detectors.common import (
+    is_likely_service_response,
+    is_valid_arp_sender,
+    protocol_mismatch,
+)
 
 
 @dataclass
@@ -131,11 +135,18 @@ class RollingStateTracker:
                 state.icmp_count += 1
             if p.protocol == "UDP" and p.dns_query:
                 state.dns_queries.append(p.dns_query)
-            if p.arp_psrc and p.arp_hwsrc:
-                previous = latest_arp.get(p.arp_psrc)
-                if previous and previous != p.arp_hwsrc:
-                    local_arp_changes += 1
-                latest_arp[p.arp_psrc] = p.arp_hwsrc
+            if p.protocol == "ARP":
+                arp_psrc = p.arp_psrc
+                arp_hwsrc = p.arp_hwsrc
+                if (
+                    arp_psrc is not None
+                    and arp_hwsrc is not None
+                    and is_valid_arp_sender(arp_psrc, arp_hwsrc)
+                ):
+                    previous = latest_arp.get(arp_psrc)
+                    if previous and previous != arp_hwsrc:
+                        local_arp_changes += 1
+                    latest_arp[arp_psrc] = arp_hwsrc
             if p.protocol != "OTHER":
                 protocol_counter[p.protocol] += 1
                 if self._is_protocol_mismatch(p):

@@ -15,8 +15,7 @@ class DNSTunnelingDetector(Detector):
         lengths = [max_label_length(q) for q in queries]
         max_entropy = max(entropies, default=0.0); max_len = max(lengths, default=0)
         signal = max_entropy >= self.cfg["entropy"] and max_len >= self.cfg["label_length"]
-        volume_signal = n >= self.cfg.get("high_queries", n + 1)
-        if not signal and not volume_signal: return None
+        if not signal: return None
         return DetectionResult(self.attack_type, self.rule_id, packet.src_ip, packet.dst_ip, "UDP",
             {"reason": "DNS query volume/label characteristics crossed explicit tunneling heuristics."},
             {"queries": n, "max_entropy": round(max_entropy, 3), "max_label_length": max_len},

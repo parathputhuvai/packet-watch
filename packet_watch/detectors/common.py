@@ -1,6 +1,22 @@
 from __future__ import annotations
 
+import ipaddress
 import math
+import re
+
+
+def is_valid_arp_sender(sender_ip: str | None, sender_mac: str | None) -> bool:
+    if not isinstance(sender_ip, str) or not isinstance(sender_mac, str):
+        return False
+    if not sender_ip or not sender_mac:
+        return False
+
+    try:
+        ipaddress.IPv4Address(sender_ip)
+    except ipaddress.AddressValueError:
+        return False
+
+    return re.fullmatch(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}", sender_mac) is not None
 
 
 def shannon_entropy(value: str) -> float:
@@ -47,6 +63,11 @@ COMMON_UDP_PORTS = {
 
 COMMON_SERVICE_PORTS = COMMON_TCP_PORTS | COMMON_UDP_PORTS
 
+# Windows discovery/service signatures that are not general-purpose service
+# ports. These are evaluated with direction and destination constraints below.
+WINDOWS_DISCOVERY_TCP_PORTS = {2869, 5357}
+WINDOWS_DISCOVERY_UDP_PORTS = {3702}
+
 
 def is_likely_service_response(packet) -> bool:
     """Return True for a packet shaped like a service response.
@@ -70,6 +91,29 @@ def is_likely_service_response(packet) -> bool:
     )
 
 
+def is_known_discovery_service(packet) -> bool:
+    """Return True for bounded Windows discovery/service request signatures."""
+    if packet.protocol == "TCP" and packet.dst_port in WINDOWS_DISCOVERY_TCP_PORTS:
+        return is_private_or_local(packet.dst_ip)
+
+    if packet.protocol == "TCP" and packet.src_port in WINDOWS_DISCOVERY_TCP_PORTS:
+        return packet.dst_port is not None and packet.dst_port >= 1024 and is_private_or_local(packet.src_ip)
+
+    if packet.protocol == "UDP" and packet.dst_port in WINDOWS_DISCOVERY_UDP_PORTS:
+        if not packet.dst_ip:
+            return False
+        try:
+            address = ipaddress.ip_address(packet.dst_ip)
+        except ValueError:
+            return False
+        return address.is_multicast or packet.dst_ip == "255.255.255.255"
+
+    if packet.protocol == "UDP" and packet.src_port in WINDOWS_DISCOVERY_UDP_PORTS:
+        return packet.dst_port is not None and packet.dst_port >= 1024 and is_private_or_local(packet.src_ip)
+
+    return False
+
+
 def protocol_mismatch(packet) -> bool:
     """Detect likely non-standard destination-port usage.
 
@@ -78,6 +122,9 @@ def protocol_mismatch(packet) -> bool:
     treated as a likely response rather than a mismatch.
     """
     if packet.dst_port is None:
+        return False
+
+    if is_known_discovery_service(packet):
         return False
 
     expected = {
