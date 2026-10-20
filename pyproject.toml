@@ -13,6 +13,7 @@ dependencies = [
   "requests>=2.31,<3",
   "python-dotenv>=1.0,<2",
   "fpdf2>=2.7,<3",
+  "cryptography>=42",
 ]
 
 [project.scripts]
@@ -21,3 +22,5 @@ packet-watch = "packet_watch.cli.main:main"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+[tool.setuptools.packages.find]
+include = ["packet_watch*"]
